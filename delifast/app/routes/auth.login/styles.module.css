@@ -1,0 +1,68 @@
+/* app/routes/auth.login/styles.module.css */
+
+.index {
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f9f9f9;
+}
+
+.content {
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.heading {
+  font-size: 24px;
+  margin-bottom: 16px;
+}
+
+.text {
+  font-size: 16px;
+  margin-bottom: 32px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.input {
+  padding: 10px;
+  font-size: 14px;
+  margin-bottom: 16px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.button {
+  padding: 12px;
+  font-size: 16px;
+  background-color: #5c6bc0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #3f51b5;
+}
+
+.list {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.list li {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
