@@ -2,7 +2,7 @@
 # https://shopify.dev/docs/apps/tools/cli/configuration
 client_id = "6f796b9423078f6953f6c523ad8d5c3c"
 name = "Delifast Public"
-application_url = "https://delifast-public-co0b.onrender.com"
+application_url = "https://delifast-public1.onrender.com"
 embedded = true
 
 [build]
@@ -45,6 +45,6 @@ scopes = "read_orders,write_orders,read_fulfillments,write_fulfillments,read_cus
 
 [auth]
 redirect_urls = [
-  "https://delifast-public-co0b.onrender.com/auth/callback",
-  "https://delifast-public-co0b.onrender.com/auth/login"
+  "https://delifast-public1.onrender.com/auth/callback",
+  "https://delifast-public1.onrender.com/auth/login"
 ]
