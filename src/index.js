@@ -1,142 +1,63 @@
 /**
- * Delifast Shopify App - Main Entry Point
- * 
- * This app integrates Shopify stores with Delifast delivery system,
- * replicating all features from the WooCommerce Delifast plugin.
+ * Application Configuration
  */
 
-import express from 'express';
-import cors from 'cors';
-import cron from 'node-cron';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { config } from './config/index.js';
-import { logger } from './services/logger.js';
-import { webhookRoutes } from './routes/webhooks.js';
-import { apiRoutes } from './routes/api.js';
-import { settingsRoutes } from './routes/settings.js';
-import { syncShipmentStatuses } from './jobs/syncStatuses.js';
-import { updateTemporaryIds } from './jobs/updateTempIds.js';
-import { checkPendingOrders } from './jobs/checkPending.js';
-import { prisma } from './config/database.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-
-// Middleware
-app.use(cors());
-
-// Raw body for webhook signature verification
-app.use('/webhooks', express.raw({ type: 'application/json' }));
-
-// JSON body for other routes
-app.use(express.json());
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    app: 'delifast-shopify',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Routes
-app.use('/webhooks', webhookRoutes);
-app.use('/api', apiRoutes);
-app.use('/settings', settingsRoutes);
-
-// Serve frontend static files
-app.use(express.static(path.join(__dirname, '../web/frontend')));
-
-// Serve frontend for all non-API routes (SPA support)
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../web/frontend/index.html'));
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  logger.error('Unhandled error', { 
-    error: err.message, 
-    stack: err.stack,
-    path: req.path 
-  });
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: config.isDev ? err.message : undefined
-  });
-});
-
-// Schedule background jobs
-function scheduleJobs() {
-  // Sync shipment statuses every hour
-  cron.schedule('0 * * * *', async () => {
-    logger.info('Running hourly status sync job');
-    try {
-      await syncShipmentStatuses();
-    } catch (error) {
-      logger.error('Status sync job failed', { error: error.message });
-    }
-  });
-
-  // Update temporary IDs every hour
-  cron.schedule('30 * * * *', async () => {
-    logger.info('Running hourly temp ID update job');
-    try {
-      await updateTemporaryIds();
-    } catch (error) {
-      logger.error('Temp ID update job failed', { error: error.message });
-    }
-  });
-
-  // Check pending orders every 4 hours
-  cron.schedule('0 */4 * * *', async () => {
-    logger.info('Running pending orders check job');
-    try {
-      await checkPendingOrders();
-    } catch (error) {
-      logger.error('Pending orders check job failed', { error: error.message });
-    }
-  });
-
-  logger.info('Background jobs scheduled');
-}
-
-// Start server
-async function start() {
-  try {
-    // Test database connection
-    await prisma.$connect();
-    logger.info('Database connected');
-
-    // Schedule background jobs
-    scheduleJobs();
-
-    // Start HTTP server
-    app.listen(config.port, () => {
-      logger.info(`Delifast Shopify app running on port ${config.port}`);
-      logger.info(`Environment: ${config.isDev ? 'development' : 'production'}`);
-    });
-  } catch (error) {
-    logger.error('Failed to start app', { error: error.message });
-    process.exit(1);
+export const config = {
+  // Environment
+  isDev: process.env.NODE_ENV !== 'production',
+  
+  // Server
+  port: parseInt(process.env.PORT || '3000', 10),
+  host: process.env.SHOPIFY_APP_URL || process.env.HOST || 'http://localhost:3000',
+  
+  // Shopify
+  shopify: {
+    apiKey: process.env.SHOPIFY_API_KEY,
+    // Render uses SHOPIFY_API_SECRET_KEY (fallback to SHOPIFY_API_SECRET for older envs)
+    apiSecret: process.env.SHOPIFY_API_SECRET_KEY || process.env.SHOPIFY_API_SECRET,
+    apiVersion: process.env.SHOPIFY_API_VERSION || '2026-04',
+    // Render uses SCOPES (fallback to SHOPIFY_SCOPES for older envs)
+    scopes: (process.env.SCOPES || process.env.SHOPIFY_SCOPES)?.split(',') || [
+      'read_orders',
+      'write_orders',
+      'read_fulfillments',
+      'write_fulfillments',
+      'read_customers',
+      'write_metafields',
+      'read_metafields'
+    ],
+    appUrl: process.env.SHOPIFY_APP_URL,
+    storeDomain: process.env.SHOPIFY_STORE_DOMAIN,
+    accessToken: process.env.SHOPIFY_ACCESS_TOKEN,
+  },
+  
+  // Delifast API
+  delifast: {
+    baseUrl: 'https://portal.delifast.ae/api',
+    endpoints: {
+      login: '/Login/Login',
+      createShipment: '/Customer/WooCommerceCreateShipment',
+      getStatus: '/Customer/WooCommerceShipmentstatue',
+      lookupByOrderNumber: '/Customer/LookupOrderShipments',
+      lookupShipment: '/Customer/LookupShipmentByOrderNumber',
+      getCities: '/Customer/GetCities',
+      getAreas: '/Customer/GetAreas',
+      cancelShipment: '/Customer/CancelShipment',
+      getPaymentMethods: '/Customer/GetPaymentMethods',
+    },
+    tokenExpiryHours: 24,
+    tokenRefreshMinutes: 30, // Refresh 30 min before expiry
+  },
+  
+  // Encryption
+  encryptionKey: process.env.ENCRYPTION_KEY || 'default_key_change_in_production',
+  
+  // Job settings
+  jobs: {
+    maxLookupAttempts: 24, // Max attempts to find real shipment ID
+    lookupIntervalMinutes: 60, // Time between lookup attempts
   }
-}
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('Received SIGTERM, shutting down gracefully');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT, shutting down gracefully');
-  await prisma.$disconnect();
-  process.exit(0);
-});
-
-start();
+};
